@@ -69,20 +69,22 @@ class Bullet {
   }
 }
 
-// ── Power-ups: disparo triple y escudo ────────────────────────────────────────
+// ── Power-ups: disparo triple, escudo y cámara lenta ──────────────────────────
 const TRIPLE_SHOT_TIME   = 10;    // segundos que dura el disparo triple
 const TRIPLE_SHOT_SPREAD = 0.22;  // separación angular entre balas (rad)
 const SHIELD_TIME  = 10;          // segundos que dura el escudo (o hasta un golpe)
 const SHIELD_GRACE = 1;           // invencibilidad tras absorber un golpe (s)
+const SLOW_TIME    = 6;           // segundos que dura la cámara lenta
+const SLOW_FACTOR  = 0.5;         // velocidad de los asteroides en cámara lenta
 const POWERUP_TTL = 8;         // segundos que el power-up flota antes de desaparecer
-const POWERUP_COLORS = { triple: '#4cf', shield: '#7f7' };
+const POWERUP_COLORS = { triple: '#4cf', shield: '#7f7', slow: '#c8f' };
 const POWERUP_TYPES  = Object.keys(POWERUP_COLORS);
 
 class PowerUp {
   constructor(x, y, type) {
     this.x = x;
     this.y = y;
-    this.type = type;  // 'triple' | 'shield'
+    this.type = type;  // 'triple' | 'shield' | 'slow'
     const angle = rand(0, Math.PI * 2);
     const speed = rand(15, 35);
     this.vx = Math.cos(angle) * speed;
@@ -122,6 +124,13 @@ class PowerUp {
         ctx.moveTo(0, 5);
         ctx.lineTo(Math.cos(ang) * 7, 5 + Math.sin(ang) * 11);
       }
+    } else if (this.type === 'slow') {
+      // Icono: reloj de arena
+      ctx.moveTo(-5, -7);
+      ctx.lineTo( 5, -7);
+      ctx.lineTo(-5,  7);
+      ctx.lineTo( 5,  7);
+      ctx.closePath();
     } else {
       // Icono: escudo
       ctx.moveTo(0, -7);
@@ -269,6 +278,7 @@ class Ship {
     // Segundos restantes de cada power-up; sobreviven a cambios de nivel
     this.tripleShot = 0;
     this.shield     = 0;
+    this.slow       = 0;
     this.reset();
   }
 
@@ -291,6 +301,7 @@ class Ship {
     if (this.shootCooldown > 0) this.shootCooldown -= dt;
     if (this.tripleShot    > 0) this.tripleShot    -= dt;
     if (this.shield        > 0) this.shield        -= dt;
+    if (this.slow          > 0) this.slow          -= dt;
 
     const ROT   = 3.5;   // rad/s
     const THRUST = 260;  // px/s²
@@ -486,6 +497,7 @@ function killShip() {
   ship.dead = true;
   ship.tripleShot = 0;
   ship.shield     = 0;
+  ship.slow       = 0;
   lives--;
   if (lives <= 0) {
     state = 'gameover';
@@ -522,7 +534,9 @@ function update(dt) {
 
   ship.update(dt);
   bullets.forEach(b => b.update(dt));
-  asteroids.forEach(a => a.update(dt));
+  // En cámara lenta solo los asteroides se frenan
+  const asteroidDt = ship.slow > 0 ? dt * SLOW_FACTOR : dt;
+  asteroids.forEach(a => a.update(asteroidDt));
   particles.forEach(p => p.update(dt));
   powerups.forEach(p => p.update(dt));
 
@@ -547,8 +561,9 @@ function update(dt) {
   for (const p of powerups) {
     if (dist(ship, p) < ship.radius + p.radius) {
       p.dead = true;
-      if (p.type === 'triple') ship.tripleShot = TRIPLE_SHOT_TIME;
-      else                     ship.shield     = SHIELD_TIME;
+      if      (p.type === 'triple') ship.tripleShot = TRIPLE_SHOT_TIME;
+      else if (p.type === 'shield') ship.shield     = SHIELD_TIME;
+      else                          ship.slow       = SLOW_TIME;
       explode(p.x, p.y, 6);
     }
   }
@@ -618,6 +633,11 @@ function drawHUD() {
   if (ship.shield > 0) {
     ctx.fillStyle = POWERUP_COLORS.shield;
     ctx.fillText(`ESCUDO  ${Math.ceil(ship.shield)}s`, 14, hudY);
+    hudY += 22;
+  }
+  if (ship.slow > 0) {
+    ctx.fillStyle = POWERUP_COLORS.slow;
+    ctx.fillText(`LENTO  ${Math.ceil(ship.slow)}s`, 14, hudY);
   }
 }
 
