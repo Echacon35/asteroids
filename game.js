@@ -10,7 +10,7 @@ const H = 600;
 const keys = {};
 const justPressed = {};
 
-const GAME_KEYS = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Space'];
+const GAME_KEYS = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Space', 'KeyB'];
 
 window.addEventListener('keydown', e => {
   // Evita que las flechas y la barra espaciadora desplacen la página
@@ -69,22 +69,25 @@ class Bullet {
   }
 }
 
-// ── Power-ups: disparo triple, escudo y cámara lenta ──────────────────────────
+// ── Power-ups: disparo triple, escudo, cámara lenta y bomba ───────────────────
 const TRIPLE_SHOT_TIME   = 10;    // segundos que dura el disparo triple
 const TRIPLE_SHOT_SPREAD = 0.22;  // separación angular entre balas (rad)
 const SHIELD_TIME  = 10;          // segundos que dura el escudo (o hasta un golpe)
 const SHIELD_GRACE = 1;           // invencibilidad tras absorber un golpe (s)
 const SLOW_TIME    = 6;           // segundos que dura la cámara lenta
 const SLOW_FACTOR  = 0.5;         // velocidad de los asteroides en cámara lenta
+const BOMB_DROP_CHANCE = 0.03;    // probabilidad por asteroide destruido (una vez por partida)
+const BOMB_FLASH_TIME  = 0.4;     // duración del destello al detonar (s)
 const POWERUP_TTL = 8;         // segundos que el power-up flota antes de desaparecer
-const POWERUP_COLORS = { triple: '#4cf', shield: '#7f7', slow: '#c8f' };
-const POWERUP_TYPES  = Object.keys(POWERUP_COLORS);
+const POWERUP_COLORS = { triple: '#4cf', shield: '#7f7', slow: '#c8f', bomb: '#f84' };
+// Tipos que salen una vez por nivel; la bomba tiene su propia regla
+const POWERUP_TYPES  = ['triple', 'shield', 'slow'];
 
 class PowerUp {
   constructor(x, y, type) {
     this.x = x;
     this.y = y;
-    this.type = type;  // 'triple' | 'shield' | 'slow'
+    this.type = type;  // 'triple' | 'shield' | 'slow' | 'bomb'
     const angle = rand(0, Math.PI * 2);
     const speed = rand(15, 35);
     this.vx = Math.cos(angle) * speed;
@@ -124,6 +127,11 @@ class PowerUp {
         ctx.moveTo(0, 5);
         ctx.lineTo(Math.cos(ang) * 7, 5 + Math.sin(ang) * 11);
       }
+    } else if (this.type === 'bomb') {
+      // Icono: bomba con mecha
+      ctx.arc(0, 2, 5, 0, Math.PI * 2);
+      ctx.moveTo(3, -2);
+      ctx.lineTo(6, -7);
     } else if (this.type === 'slow') {
       // Icono: reloj de arena
       ctx.moveTo(-5, -7);
@@ -279,6 +287,7 @@ class Ship {
     this.tripleShot = 0;
     this.shield     = 0;
     this.slow       = 0;
+    this.hasBomb    = false;  // bomba guardada; se conserva al morir hasta usarla
     this.reset();
   }
 
@@ -417,6 +426,8 @@ class Particle {
 let ship, bullets, asteroids, particles, powerups;
 let levelKills;     // asteroides destruidos en el nivel actual
 let powerupDrops;   // { tipo: destrucción que lo suelta en este nivel } (Infinity = ya soltado)
+let bombSpawned;    // la bomba solo aparece una vez por partida
+let bombFlash;      // segundos restantes del destello de la bomba
 let score, lives, level;
 let state;      // 'playing' | 'dead' | 'gameover'
 let deadTimer;
@@ -462,6 +473,21 @@ function destroyAsteroid(a, newAsteroids) {
       powerupDrops[type] = Infinity;
     }
   }
+  if (!bombSpawned && Math.random() < BOMB_DROP_CHANCE) {
+    powerups.push(new PowerUp(a.x, a.y, 'bomb'));
+    bombSpawned = true;
+  }
+}
+
+// Detona la bomba: destruye por completo (sin fragmentos) todos los asteroides
+function detonateBomb() {
+  ship.hasBomb = false;
+  bombFlash    = BOMB_FLASH_TIME;
+  for (const a of asteroids) {
+    score += POINTS[a.size];
+    explode(a.x, a.y, a.size * 5);
+  }
+  asteroids = [];
 }
 
 function initGame() {
@@ -470,6 +496,8 @@ function initGame() {
   asteroids = [];
   particles = [];
   powerups  = [];
+  bombSpawned = false;
+  bombFlash   = 0;
   score  = 0;
   lives  = 3;
   level  = 1;
@@ -509,6 +537,10 @@ function killShip() {
 
 // ── Update ────────────────────────────────────────────────────────────────────
 function update(dt) {
+  if (bombFlash > 0) bombFlash -= dt;
+  // Se consume en todos los estados para que no se dispare sola al reaparecer
+  const bombKey = pressed('KeyB');
+
   if (state === 'gameover') {
     if (pressed('Space')) initGame();
     particles.forEach(p => p.update(dt));
@@ -531,6 +563,9 @@ function update(dt) {
   if (pressed('Space')) {
     bullets.push(...ship.tryShoot());
   }
+
+  // Detonar la bomba guardada
+  if (bombKey && ship.hasBomb) detonateBomb();
 
   ship.update(dt);
   bullets.forEach(b => b.update(dt));
@@ -563,7 +598,8 @@ function update(dt) {
       p.dead = true;
       if      (p.type === 'triple') ship.tripleShot = TRIPLE_SHOT_TIME;
       else if (p.type === 'shield') ship.shield     = SHIELD_TIME;
-      else                          ship.slow       = SLOW_TIME;
+      else if (p.type === 'slow')   ship.slow       = SLOW_TIME;
+      else                          ship.hasBomb    = true;
       explode(p.x, p.y, 6);
     }
   }
@@ -622,6 +658,12 @@ function drawHUD() {
   for (let i = 0; i < lives; i++)
     drawLifeIcon(W - 16 - i * 22, 18);
 
+  if (ship.hasBomb) {
+    ctx.textAlign = 'right';
+    ctx.fillStyle = POWERUP_COLORS.bomb;
+    ctx.fillText('BOMBA [B]', W - 14, 48);
+  }
+
   // Power-ups activos, uno por línea bajo la puntuación
   ctx.textAlign = 'left';
   let hudY = 48;
@@ -660,6 +702,12 @@ function draw() {
   powerups.forEach(p => p.draw());
   bullets.forEach(b => b.draw());
   ship.draw();
+
+  // Destello de la bomba
+  if (bombFlash > 0) {
+    ctx.fillStyle = `rgba(255,200,150,${(bombFlash / BOMB_FLASH_TIME * 0.7).toFixed(2)})`;
+    ctx.fillRect(0, 0, W, H);
+  }
 
   drawHUD();
 
