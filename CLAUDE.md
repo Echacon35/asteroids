@@ -31,5 +31,8 @@ npx serve .   # then visit http://localhost:3000
 
 - The UI text, code comments and README are in Spanish. Keep new user-facing strings and comments in Spanish.
 - The file is split into sections by `// ── Name ───` banner comments. Add new systems as new banner sections.
-- **Power-ups**: the triple-shot power-up (`PowerUp` class, `powerups` global) drops exactly once per level: `planPowerupDrop()` (called after each `spawnAsteroids()`) picks a random kill number `powerupDropAt` within the first 70 % of the level's kills (7 per large asteroid), counted by `levelKills`. Picking it up sets `ship.tripleShot` to `TRIPLE_SHOT_TIME` (10 s). The timer survives level changes and is cleared in `killShip()`.
+- **Power-ups**: `PowerUp` entities (in the `powerups` global) have a `type` of `'triple'` or `'shield'`. `POWERUP_COLORS` sets each type's color, and its keys form `POWERUP_TYPES`. Each type drops exactly once per level. `planPowerupDrop()` runs after each `spawnAsteroids()` and picks a distinct random kill number per type, stored in `powerupDrops`, within the first 70 % of the level's kills (7 per large asteroid). `levelKills` counts the kills. `destroyAsteroid()` handles score, explosion, split and drops for both bullet hits and shield hits.
+  - Triple shot: sets `ship.tripleShot` to `TRIPLE_SHOT_TIME` (10 s), and `tryShoot()` fires 3 bullets in a fan.
+  - Shield: sets `ship.shield` to `SHIELD_TIME` (10 s). The first asteroid hit clears it, destroys that asteroid and grants `SHIELD_GRACE` (1 s) of invincibility.
+  - Both timers live outside `reset()`, survive level changes and are cleared in `killShip()`.
 - The README mentions special asteroid types (such as a shooting star, "estrella fugaz"), but `game.js` does not implement them yet.
