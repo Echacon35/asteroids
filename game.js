@@ -69,7 +69,7 @@ class Bullet {
   }
 }
 
-// ── Power-ups: disparo triple, escudo, cámara lenta y bomba ───────────────────
+// ── Power-ups: disparo triple, escudo, cámara lenta, bomba e hiperpropulsión ──
 const TRIPLE_SHOT_TIME   = 10;    // segundos que dura el disparo triple
 const TRIPLE_SHOT_SPREAD = 0.22;  // separación angular entre balas (rad)
 const SHIELD_TIME  = 10;          // segundos que dura el escudo (o hasta un golpe)
@@ -78,16 +78,19 @@ const SLOW_TIME    = 6;           // segundos que dura la cámara lenta
 const SLOW_FACTOR  = 0.5;         // velocidad de los asteroides en cámara lenta
 const BOMB_DROP_CHANCE = 0.03;    // probabilidad por asteroide destruido (una vez por partida)
 const BOMB_FLASH_TIME  = 0.4;     // duración del destello al detonar (s)
+const HYPER_TIME   = 8;           // segundos que dura la hiperpropulsión
+const HYPER_THRUST = 2.5;         // multiplica el empuje (aceleración y velocidad máxima)
+const HYPER_ROT    = 1.6;         // multiplica la velocidad de giro
 const POWERUP_TTL = 8;         // segundos que el power-up flota antes de desaparecer
-const POWERUP_COLORS = { triple: '#4cf', shield: '#7f7', slow: '#c8f', bomb: '#f84' };
+const POWERUP_COLORS = { triple: '#4cf', shield: '#7f7', slow: '#c8f', bomb: '#f84', hyper: '#ff4' };
 // Tipos que salen una vez por nivel; la bomba tiene su propia regla
-const POWERUP_TYPES  = ['triple', 'shield', 'slow'];
+const POWERUP_TYPES  = ['triple', 'shield', 'slow', 'hyper'];
 
 class PowerUp {
   constructor(x, y, type) {
     this.x = x;
     this.y = y;
-    this.type = type;  // 'triple' | 'shield' | 'slow' | 'bomb'
+    this.type = type;  // 'triple' | 'shield' | 'slow' | 'bomb' | 'hyper'
     const angle = rand(0, Math.PI * 2);
     const speed = rand(15, 35);
     this.vx = Math.cos(angle) * speed;
@@ -132,6 +135,14 @@ class PowerUp {
       ctx.arc(0, 2, 5, 0, Math.PI * 2);
       ctx.moveTo(3, -2);
       ctx.lineTo(6, -7);
+    } else if (this.type === 'hyper') {
+      // Icono: doble chevrón apuntando hacia arriba
+      ctx.moveTo(-6, -1);
+      ctx.lineTo( 0, -7);
+      ctx.lineTo( 6, -1);
+      ctx.moveTo(-6,  6);
+      ctx.lineTo( 0,  0);
+      ctx.lineTo( 6,  6);
     } else if (this.type === 'slow') {
       // Icono: reloj de arena
       ctx.moveTo(-5, -7);
@@ -287,6 +298,7 @@ class Ship {
     this.tripleShot = 0;
     this.shield     = 0;
     this.slow       = 0;
+    this.hyper      = 0;
     this.hasBomb    = false;  // bomba guardada; se conserva al morir hasta usarla
     this.reset();
   }
@@ -311,9 +323,12 @@ class Ship {
     if (this.tripleShot    > 0) this.tripleShot    -= dt;
     if (this.shield        > 0) this.shield        -= dt;
     if (this.slow          > 0) this.slow          -= dt;
+    if (this.hyper         > 0) this.hyper         -= dt;
 
-    const ROT   = 3.5;   // rad/s
-    const THRUST = 260;  // px/s²
+    // La hiperpropulsión multiplica el giro y el empuje (y con él la velocidad máxima)
+    const hyper  = this.hyper > 0;
+    const ROT    = 3.5 * (hyper ? HYPER_ROT    : 1);  // rad/s
+    const THRUST = 260 * (hyper ? HYPER_THRUST : 1);  // px/s²
     const DRAG   = 0.987;
 
     if (keys['ArrowLeft'])  this.angle -= ROT * dt;
@@ -376,13 +391,14 @@ class Ship {
     ctx.closePath();
     ctx.stroke();
 
-    // Llama del propulsor
+    // Llama del propulsor (más larga y amarilla con hiperpropulsión)
     if (this.thrusting && Math.random() > 0.35) {
+      const hyper = this.hyper > 0;
       ctx.beginPath();
       ctx.moveTo(-8, -4);
-      ctx.lineTo(-8 - rand(6, 14), 0);
+      ctx.lineTo(-8 - (hyper ? rand(14, 26) : rand(6, 14)), 0);
       ctx.lineTo(-8,  4);
-      ctx.strokeStyle = 'rgba(255, 130, 0, 0.85)';
+      ctx.strokeStyle = hyper ? 'rgba(255, 255, 70, 0.9)' : 'rgba(255, 130, 0, 0.85)';
       ctx.stroke();
     }
 
@@ -526,6 +542,7 @@ function killShip() {
   ship.tripleShot = 0;
   ship.shield     = 0;
   ship.slow       = 0;
+  ship.hyper      = 0;
   lives--;
   if (lives <= 0) {
     state = 'gameover';
@@ -599,6 +616,7 @@ function update(dt) {
       if      (p.type === 'triple') ship.tripleShot = TRIPLE_SHOT_TIME;
       else if (p.type === 'shield') ship.shield     = SHIELD_TIME;
       else if (p.type === 'slow')   ship.slow       = SLOW_TIME;
+      else if (p.type === 'hyper')  ship.hyper      = HYPER_TIME;
       else                          ship.hasBomb    = true;
       explode(p.x, p.y, 6);
     }
@@ -680,6 +698,11 @@ function drawHUD() {
   if (ship.slow > 0) {
     ctx.fillStyle = POWERUP_COLORS.slow;
     ctx.fillText(`LENTO  ${Math.ceil(ship.slow)}s`, 14, hudY);
+    hudY += 22;
+  }
+  if (ship.hyper > 0) {
+    ctx.fillStyle = POWERUP_COLORS.hyper;
+    ctx.fillText(`HIPER  ${Math.ceil(ship.hyper)}s`, 14, hudY);
   }
 }
 

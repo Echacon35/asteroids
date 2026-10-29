@@ -51,4 +51,5 @@ Luego visita `http://localhost:3000`.
 - Power-up de **disparo triple**: una vez por nivel, un asteroide destruido al azar suelta un ícono azul; al recogerlo la nave dispara 3 balas en abanico durante 10 segundos
 - Power-up de **escudo**: también aparece una vez por nivel (ícono verde); rodea la nave con un círculo de energía que absorbe un impacto de asteroide durante 10 segundos
 - Power-up de **cámara lenta**: también aparece una vez por nivel (ícono morado); los asteroides se mueven a la mitad de velocidad durante 6 segundos mientras la nave mantiene su velocidad normal
+- Power-up de **hiperpropulsión**: también aparece una vez por nivel (ícono amarillo); aumenta drásticamente la aceleración, la velocidad máxima y el giro de la nave durante 8 segundos para esquivar con precisión
 - **Bomba** (ítem escaso, una sola por partida, ícono naranja): un asteroide destruido puede soltarla; se guarda al recogerla y al pulsar `B` destruye todos los asteroides en pantalla. Un solo uso
