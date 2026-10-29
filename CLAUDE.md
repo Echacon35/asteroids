@@ -31,4 +31,5 @@ npx serve .   # then visit http://localhost:3000
 
 - The UI text, code comments and README are in Spanish. Keep new user-facing strings and comments in Spanish.
 - The file is split into sections by `// ── Name ───` banner comments. Add new systems as new banner sections.
-- The README mentions power-ups and special asteroid types (such as a shooting star, "estrella fugaz"), but `game.js` does not implement them yet.
+- **Power-ups**: the triple-shot power-up (`PowerUp` class, `powerups` global) drops exactly once per level: `planPowerupDrop()` (called after each `spawnAsteroids()`) picks a random kill number `powerupDropAt` within the first 70 % of the level's kills (7 per large asteroid), counted by `levelKills`. Picking it up sets `ship.tripleShot` to `TRIPLE_SHOT_TIME` (10 s). The timer survives level changes and is cleared in `killShip()`.
+- The README mentions special asteroid types (such as a shooting star, "estrella fugaz"), but `game.js` does not implement them yet.
